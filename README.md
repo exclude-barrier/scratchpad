@@ -50,6 +50,18 @@ option is on. The same goes for the dock's `Super+Shift+1..4` app keys.
 
 ## Installation
 
+From a release: download `scratchpad@exclude-barrier.github.io.shell-extension.zip`
+from the [latest release](https://github.com/exclude-barrier/scratchpad/releases/latest), then
+
+```
+gnome-extensions install --force scratchpad@exclude-barrier.github.io.shell-extension.zip
+```
+
+log out and back in, and run
+`gnome-extensions enable scratchpad@exclude-barrier.github.io`.
+
+From source:
+
 ```
 git clone https://github.com/exclude-barrier/scratchpad.git
 cd scratchpad
