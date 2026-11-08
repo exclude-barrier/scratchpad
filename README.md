@@ -6,7 +6,7 @@ A drop-down scratchpad overlay for GNOME Shell 46–51.
 [Changelog](CHANGELOG.md) · [Contributing](CONTRIBUTING.md) ·
 [Release checklist](RELEASE.md) · [Security](SECURITY.md)
 
-Press `Super+Q` and an overlay slides up from the bottom over the current
+Press `Super+S` and an overlay slides up from the bottom over the current
 workspace, with everything underneath dimmed and blurred. If the scratchpad is
 empty, it starts a terminal. Add any window to it, and the window stays there,
 at the position and size you give it, until you release it.
@@ -38,15 +38,24 @@ assertions are documented in [RELEASE.md](RELEASE.md).
 
 | Key | Action |
 |---|---|
-| `Super+Q` | Show or hide the overlay. Empty scratchpad: start the terminal |
-| `Super+Shift+Q` | Add the focused window to the scratchpad, or release it |
+| `Super+S` | Show or hide the overlay. Empty scratchpad: start the terminal |
+| `Ctrl+Super+S` | Add the focused window to the scratchpad, or release it |
 | Click on the dimmed area | Hide the overlay |
 | `Super+Shift+1..4` (optional, see [Installation](#installation)) | Move the window to workspace 1..4; this also releases it |
 
 Both main keys can be changed in the [preferences window](#settings).
 
-`Super+Q` is also the Ubuntu Dock shortcut, but only if the dock's `hot-keys`
-option is on. The same goes for the dock's `Super+Shift+1..4` app keys.
+GNOME uses `Super+S` for the quick settings menu by default. Free it so the
+scratchpad gets the key (`install.sh` prints a note while it is still bound):
+
+```sh
+gsettings set org.gnome.shell.keybindings toggle-quick-settings "[]"
+```
+
+To undo this, run `gsettings reset org.gnome.shell.keybindings toggle-quick-settings`.
+Alternatively, pick other keys in the [preferences window](#settings).
+The Ubuntu Dock's `Super+Shift+1..4` app keys, when its `hot-keys` option is
+on, overlap with the optional workspace keys.
 
 ## Behaviour
 
@@ -80,7 +89,7 @@ option is on. The same goes for the dock's `Super+Shift+1..4` app keys.
   Physical-input and authenticated screen-lock tests remain manual; see
   [release validation](RELEASE.md).
 - A terminal that can set its own WM class. The default is
-  [Ghostty](https://ghostty.org). Without one, `Super+Q` on an empty
+  [Ghostty](https://ghostty.org). Without one, `Super+S` on an empty
   scratchpad shows the empty overlay.
 - To build from source: Node.js 24 with npm, `glib-compile-schemas` and `zip`.
   Package validation also needs `unzip` (Debian/Ubuntu packages:
@@ -159,8 +168,8 @@ gsettings --schemadir "$S" set org.gnome.shell.extensions.scratchpad tile-window
 
 | Key | Default | Meaning |
 |---|---|---|
-| `toggle-scratchpad` | `['<Super>q']` | Show or hide the overlay |
-| `move-to-scratchpad` | `['<Shift><Super>q']` | Add or release the focused window |
+| `toggle-scratchpad` | `['<Super>s']` | Show or hide the overlay |
+| `move-to-scratchpad` | `['<Control><Super>s']` | Add or release the focused window |
 | `tile-windows` | `false` | Lay out windows in columns instead of leaving them where they are |
 | `height-percent` | `100` | Overlay height in tiling mode, % of the work area |
 | `width-percent` | `100` | Overlay width in tiling mode, % of the work area |
@@ -283,22 +292,22 @@ Adding a new GNOME version:
 ### Manual test
 
 1. `LANG=C gnome-extensions info scratchpad@exclude-barrier.github.io` shows `State: ACTIVE`.
-2. `Super+Q`: the terminal slides up, the rest of the screen is dark and blurred.
-3. `Super+Q`: the overlay slides away, the dimming goes.
-4. Focus another window, `Super+Shift+Q`: it slides away. `Super+Q`: both
+2. `Super+S`: the terminal slides up, the rest of the screen is dark and blurred.
+3. `Super+S`: the overlay slides away, the dimming goes.
+4. Focus another window, `Ctrl+Super+S`: it slides away. `Super+S`: both
    windows are in the overlay, the second at its old position.
-5. Move or resize a window in the overlay, `Super+Q` twice: position stays.
+5. Move or resize a window in the overlay, `Super+S` twice: position stays.
 6. Overlay open, switch workspace: the overlay hides.
 7. Overlay open, click a window outside it: the overlay hides.
 8. Overlay open, in the scratchpad terminal run
    `sleep 2 && gnome-text-editor &`: the new window does not flash above the
    dimming. It takes focus, so the overlay then hides.
-9. Overlay open, window focused, `Super+Shift+Q`: the window is normal again.
+9. Overlay open, window focused, `Ctrl+Super+S`: the window is normal again.
 10. Window in the overlay, lock and unlock the screen: it is still in the scratchpad.
 11. Add and release a window set to "Always on Top": the setting is back.
 12. Two monitors, overlay open: drag a window to the other monitor and back.
     It stays in the scratchpad, and the monitor it is on is dimmed.
-13. Press `Super+Q` quickly several times with an empty scratchpad: only one terminal starts.
+13. Press `Super+S` quickly several times with an empty scratchpad: only one terminal starts.
 14. `tile-windows true`, add and release a maximized window: it is maximized again.
 15. Preferences window: change a shortcut and the dimming; both apply at once.
 16. Errors: `journalctl --user -b | grep -i scratchpad`.

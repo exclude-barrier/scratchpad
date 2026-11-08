@@ -3,6 +3,16 @@
 Version names follow the repository's semantic versions. The independent
 numeric submission version on extensions.gnome.org is assigned by that site.
 
+## Unreleased
+
+### Changed
+
+- Default keys are now `Super+S` (show or hide the overlay) and
+  `Ctrl+Super+S` (add or release the focused window), previously
+  `Super+Q` and `Super+Shift+Q`. Keys you set yourself are kept.
+- GNOME binds `Super+S` to quick settings by default; `install.sh` reports
+  this, and the README explains how to free the key.
+
 ## 1.3.1 — 2026-11-08
 
 ### Fixed

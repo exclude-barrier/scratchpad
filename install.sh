@@ -103,6 +103,14 @@ if $workspace_keys &&
     echo "Note: fewer than 4 workspaces; Super+Shift+N only works up to num-workspaces."
 fi
 
+# GNOME binds Super+S to the quick settings menu by default; that binding
+# takes the key from the scratchpad. Only report it, never change it.
+if gsettings get org.gnome.shell.keybindings toggle-quick-settings |
+   grep -qiE "'<super>s'"; then
+    echo "Note: Super+S also opens quick settings. To free it for the scratchpad:"
+    echo "  gsettings set org.gnome.shell.keybindings toggle-quick-settings \"[]\""
+fi
+
 echo "Installed to $DEST"
 LANG=C gnome-extensions info "$UUID" 2>/dev/null | grep -E 'State' ||
     echo "Not loaded yet: log out and in once."

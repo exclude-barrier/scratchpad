@@ -3,11 +3,11 @@
   <schema id="org.gnome.shell.extensions.scratchpad"
           path="/org/gnome/shell/extensions/scratchpad/">
     <key name="toggle-scratchpad" type="as">
-      <default><![CDATA[['<Super>q']]]></default>
+      <default><![CDATA[['<Super>s']]]></default>
       <summary>Show or hide the scratchpad overlay</summary>
     </key>
     <key name="move-to-scratchpad" type="as">
-      <default><![CDATA[['<Shift><Super>q']]]></default>
+      <default><![CDATA[['<Control><Super>s']]]></default>
       <summary>Add the focused window to the scratchpad, or release it</summary>
     </key>
     <key name="height-percent" type="i">
@@ -54,7 +54,7 @@
     <key name="launch-terminal" type="b">
       <default>true</default>
       <summary>Start a terminal when the scratchpad is empty</summary>
-      <description>If off, or if terminal-command cannot be started, Super+Q shows the empty, dimmed overlay.</description>
+      <description>If off, or if terminal-command cannot be started, Super+S shows the empty, dimmed overlay.</description>
     </key>
     <key name="terminal-command" type="as">
       <default><![CDATA[['ghostty', '--class=io.github.exclude_barrier.Scratchpad', '--gtk-single-instance=false']]]></default>
