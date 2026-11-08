@@ -11,6 +11,12 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
+      # Dependabot pull requests are reminders only: merging one would make
+      # the bot a contributor. Apply the update in your own pull request.
+      - if: github.event.pull_request.user.login == 'dependabot[bot]'
+        run: |
+          echo "::error::Do not merge Dependabot pull requests. Apply the update in your own pull request; Dependabot then closes this one."
+          exit 1
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
         with:

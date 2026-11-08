@@ -16,8 +16,7 @@ at the position and size you give it, until you release it.
 | Click on the dimmed area | Hide the overlay |
 | `Super+Shift+1..4` (optional, see [Installation](#installation)) | Move the window to workspace 1..4; this also releases it |
 
-Both main keys can be changed in the settings (`toggle-scratchpad`,
-`move-to-scratchpad`).
+Both main keys can be changed in the [preferences window](#settings).
 
 `Super+Q` is also the Ubuntu Dock shortcut, but only if the dock's `hot-keys`
 option is on. The same goes for the dock's `Super+Shift+1..4` app keys.
@@ -37,6 +36,7 @@ option is on. The same goes for the dock's `Super+Shift+1..4` app keys.
 - The overlay hides when you switch workspace (`hide-on-workspace-switch`)
   and when a window outside the scratchpad gets focus, for example by a click
   or Alt+Tab (`hide-on-focus-loss`). Dialogs of overlay windows do not count.
+- Windows that open behind the open overlay appear dimmed right away.
 - Releasing a window gives it back the state it had before: always on top,
   on all workspaces, and maximized or fullscreen if tiling removed that.
 - The extension stays enabled on the lock screen. Otherwise GNOME would turn
@@ -51,7 +51,7 @@ option is on. The same goes for the dock's `Super+Shift+1..4` app keys.
 - A terminal that can set its own WM class. The default is
   [Ghostty](https://ghostty.org). Without one, `Super+Q` on an empty
   scratchpad shows the empty overlay.
-- To build: Node.js 20 or newer and `glib-compile-schemas`.
+- To build from source: Node.js 24, `glib-compile-schemas` and `zip`.
 
 ## Installation
 
@@ -96,9 +96,12 @@ rm -rf ~/.local/share/gnome-shell/extensions/scratchpad@exclude-barrier.github.i
 
 ## Settings
 
-Open the settings from the Extensions app, or run
-`gnome-extensions prefs scratchpad@exclude-barrier.github.io`. Everything can
-also be set with `gsettings`:
+Open the preferences window from the Extensions app (Scratchpad → Settings),
+or run `gnome-extensions prefs scratchpad@exclude-barrier.github.io`. It covers
+every setting below: shortcuts (with a recorder), behaviour, terminal,
+dimming, blur and tiling.
+
+Everything can also be set with `gsettings`:
 
 ```
 S=~/.local/share/gnome-shell/extensions/scratchpad@exclude-barrier.github.io/schemas
@@ -116,7 +119,7 @@ gsettings --schemadir $S set org.gnome.shell.extensions.scratchpad tile-windows 
 | `gap-outer` | `10` | Gap between overlay and screen edge, px |
 | `gap-inner` | `5` | Half the gap between tiled windows, px |
 | `dim` | `0.6` | How dark the background gets, 0–1 |
-| `blur` | `true` | Blur the background. Turn off on slow GPUs |
+| `blur` | `true` | Blur the background. It is redrawn whenever something under the overlay changes; turn it off on slow GPUs |
 | `hide-on-workspace-switch` | `true` | Hide the overlay on workspace switch |
 | `hide-on-focus-loss` | `true` | Hide the overlay when another window gets focus |
 | `launch-terminal` | `true` | Start a terminal when the scratchpad is empty |
@@ -124,7 +127,9 @@ gsettings --schemadir $S set org.gnome.shell.extensions.scratchpad tile-windows 
 | `terminal-class` | `'io.github.exclude_barrier.Scratchpad'` | WM class of the terminal window |
 
 The terminal window must get the WM class from `terminal-class`; that is how
-the extension recognises it. Examples:
+the extension recognises it. In the preferences window the command is one
+line, for example `alacritty --class io.github.exclude_barrier.Scratchpad`.
+With `gsettings`:
 
 ```
 # Ghostty (default)
@@ -149,6 +154,7 @@ test/                 unit tests for geometry.ts (node:test)
 src/ambient.d.ts      types for GJS and GNOME Shell (@girs)
 extension/<uuid>/     metadata.json and GSettings schema
 scripts/assemble.sh   builds build/<uuid> from compiled JS, metadata and schema
+scripts/pack.sh       packs build/<uuid> into the release zip
 data/                 desktop entry for the scratchpad terminal
 deploy.sh             optional helper: build and install on a remote machine via an SSH jump host
 ```
@@ -158,11 +164,17 @@ writes the extension to `build/scratchpad@exclude-barrier.github.io`, and
 `npm run pack` also packs `build/scratchpad@exclude-barrier.github.io.shell-extension.zip`
 for a release or extensions.gnome.org (without the compiled schema; GNOME
 compiles it on install). CI runs `npm audit`, the type check, the tests and
-the build on every push.
+the build on every push and pull request; CodeQL scans the code.
 
 Before an upload to extensions.gnome.org, check the zip with
-[shexli](https://pypi.org/project/shexli/):
-`uvx shexli build/scratchpad@exclude-barrier.github.io.shell-extension.zip`.
+[shexli](https://pypi.org/project/shexli/). shexli 0.2.1 crashes with
+tree-sitter 0.26 and flags GNOME 51 as a future release (it only knows up to
+50); the second finding can be ignored:
+
+```
+uvx --python 3.12 --with 'tree-sitter<0.26' shexli \
+  "$PWD/build/scratchpad@exclude-barrier.github.io.shell-extension.zip"
+```
 
 Window behaviour (adding, releasing, animations) needs a running GNOME Shell
 and is not tested automatically.
@@ -199,14 +211,41 @@ Adding a new GNOME version:
 5. Move or resize a window in the overlay, `Super+Q` twice: position stays.
 6. Overlay open, switch workspace: the overlay hides.
 7. Overlay open, click a window outside it: the overlay hides.
-8. Overlay open, window focused, `Super+Shift+Q`: the window is normal again.
-9. Window in the overlay, lock and unlock the screen: it is still in the scratchpad.
-10. Add and release a window set to "Always on Top": the setting is back.
-11. Two monitors, overlay open: drag a window to the other monitor and back.
+8. Overlay open, in the scratchpad terminal run
+   `sleep 2 && gnome-text-editor &`: the new window does not flash above the
+   dimming. It takes focus, so the overlay then hides.
+9. Overlay open, window focused, `Super+Shift+Q`: the window is normal again.
+10. Window in the overlay, lock and unlock the screen: it is still in the scratchpad.
+11. Add and release a window set to "Always on Top": the setting is back.
+12. Two monitors, overlay open: drag a window to the other monitor and back.
     It stays in the scratchpad, and the monitor it is on is dimmed.
-12. Press `Super+Q` quickly several times with an empty scratchpad: only one terminal starts.
-13. `tile-windows true`, add and release a maximized window: it is maximized again.
-14. Errors: `journalctl --user -b | grep -i scratchpad`.
+13. Press `Super+Q` quickly several times with an empty scratchpad: only one terminal starts.
+14. `tile-windows true`, add and release a maximized window: it is maximized again.
+15. Preferences window: change a shortcut and the dimming; both apply at once.
+16. Errors: `journalctl --user -b | grep -i scratchpad`.
+
+## Contributing
+
+`main` is protected: changes go in through pull requests, squash-merged, with
+CI (`build`) and CodeQL passing. Force pushes and branch deletion are blocked.
+
+Release:
+
+1. Bump `version-name` in `metadata.json` and `version` in `package.json`,
+   run `npm install --package-lock-only`.
+2. Pull request, merge.
+3. `npm run pack`, check with shexli, then
+   `gh release create vX.Y.Z build/scratchpad@exclude-barrier.github.io.shell-extension.zip`
+   and upload the same zip to extensions.gnome.org.
+
+Dependencies: Dependabot opens pull requests for npm and GitHub Actions
+updates, but they are never merged; CI fails on them on purpose. Apply the
+update in your own pull request instead; Dependabot then closes its own.
+`@types/node` stays on the Node.js major used to build (24).
+
+## Security
+
+See [SECURITY.md](SECURITY.md). Please report vulnerabilities privately.
 
 ## License
 
