@@ -1,7 +1,7 @@
 {
   "uuid": "scratchpad@exclude-barrier.github.io",
   "name": "Scratchpad",
-  "description": "A drop-down scratchpad overlay. Super+Q slides it up over the current workspace with a dimmed, blurred background and starts a terminal if it is empty. Super+Shift+Q adds or releases the focused window. Windows keep the position and size you give them; tiling is optional.",
+  "description": "A drop-down scratchpad overlay. Super+S slides it up over the current workspace with a dimmed, blurred background and starts a terminal if it is empty. Ctrl+Super+S adds or releases the focused window. Windows keep the position and size you give them; tiling is optional.",
   "shell-version": [
     "46",
     "47",

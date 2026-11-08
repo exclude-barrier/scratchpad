@@ -4,8 +4,8 @@
 // GNOME has no hidden or special workspaces, so the scratchpad is built out
 // of windows:
 //
-//   Super + Q          show/hide the overlay
-//   Super + Shift + Q  add the focused window, or release it
+//   Super + S          show/hide the overlay
+//   Ctrl + Super + S   add the focused window, or release it
 //
 // Feature                                -> how
 //   overlays the current workspace        -> overlay windows are sticky + above
@@ -45,7 +45,7 @@ const SLIDE_IN_MS = 220;
 const SLIDE_OUT_MS = 180;
 const DIM_FADE_MS = 180;
 const BLUR_RADIUS = 30;
-// How long a started terminal may take to map its window before Super+Q may
+// How long a started terminal may take to map its window before Super+S may
 // start another one.
 const TERMINAL_LAUNCH_TIMEOUT_S = 10;
 
@@ -782,7 +782,7 @@ export default class ScratchpadExtension extends Extension {
 
     // ---- terminal ---------------------------------------------------------
 
-    // One launch at a time: pressing Super+Q again while the terminal starts
+    // One launch at a time: pressing Super+S again while the terminal starts
     // does not start a second one. The lock ends when the window shows up,
     // the process exits, or after TERMINAL_LAUNCH_TIMEOUT_S.
     //
