@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=Scratchpad
+Comment=Terminal for the Scratchpad overlay (gives the window its dock icon)
+Exec=ghostty --class=io.github.exclude_barrier.Scratchpad --gtk-single-instance=false
+Icon=utilities-terminal
+NoDisplay=true
+StartupWMClass=io.github.exclude_barrier.Scratchpad

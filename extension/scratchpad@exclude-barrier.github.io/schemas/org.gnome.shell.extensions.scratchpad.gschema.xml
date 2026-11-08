@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<schemalist>
+  <schema id="org.gnome.shell.extensions.scratchpad"
+          path="/org/gnome/shell/extensions/scratchpad/">
+    <key name="toggle-scratchpad" type="as">
+      <default><![CDATA[['<Super>q']]]></default>
+      <summary>Show or hide the scratchpad overlay</summary>
+    </key>
+    <key name="move-to-scratchpad" type="as">
+      <default><![CDATA[['<Shift><Super>q']]]></default>
+      <summary>Add the focused window to the scratchpad, or release it</summary>
+    </key>
+    <key name="height-percent" type="i">
+      <range min="20" max="100"/>
+      <default>100</default>
+      <summary>Overlay height in percent of the work area</summary>
+    </key>
+    <key name="width-percent" type="i">
+      <range min="20" max="100"/>
+      <default>100</default>
+      <summary>Overlay width in percent of the work area</summary>
+    </key>
+    <key name="tile-windows" type="b">
+      <default>false</default>
+      <summary>Tile overlay windows side by side instead of keeping their own position and size</summary>
+    </key>
+    <key name="gap-outer" type="i">
+      <range min="0" max="100"/>
+      <default>10</default>
+      <summary>Gap between overlay and screen edge in px</summary>
+    </key>
+    <key name="gap-inner" type="i">
+      <range min="0" max="50"/>
+      <default>5</default>
+      <summary>Half the gap between tiled overlay windows in px</summary>
+    </key>
+    <key name="dim" type="d">
+      <range min="0.0" max="1.0"/>
+      <default>0.6</default>
+      <summary>Dimming of everything below the overlay</summary>
+    </key>
+    <key name="blur" type="b">
+      <default>true</default>
+      <summary>Blur everything below the overlay</summary>
+    </key>
+    <key name="hide-on-workspace-switch" type="b">
+      <default>true</default>
+      <summary>Hide the overlay when the workspace changes</summary>
+    </key>
+    <key name="launch-terminal" type="b">
+      <default>true</default>
+      <summary>Start a terminal when the scratchpad is empty</summary>
+      <description>If off, or if terminal-command cannot be started, Super+Q shows the empty, dimmed overlay.</description>
+    </key>
+    <key name="terminal-command" type="as">
+      <default><![CDATA[['ghostty', '--class=io.github.exclude_barrier.Scratchpad', '--gtk-single-instance=false']]]></default>
+      <summary>Command that starts the scratchpad terminal</summary>
+      <description>The terminal window must get the WM class from terminal-class, so the extension can recognise it and add it to the scratchpad. Example for Alacritty: ['alacritty', '--class', 'io.github.exclude_barrier.Scratchpad'].</description>
+    </key>
+    <key name="terminal-class" type="s">
+      <default>'io.github.exclude_barrier.Scratchpad'</default>
+      <summary>WM class of the scratchpad terminal window</summary>
+    </key>
+  </schema>
+</schemalist>
