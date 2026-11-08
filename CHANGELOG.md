@@ -1,72 +1,100 @@
 # Changelog
 
-Version names follow the repository's semantic versions. The independent
-numeric submission version on extensions.gnome.org is assigned by that site.
+All notable changes to this project are documented here. The format follows
+[Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow
+[Semantic Versioning](https://semver.org/). extensions.gnome.org assigns its
+own numeric version to each upload.
 
-## Unreleased
+## [Unreleased]
+
+## [1.3.2] — 2026-11-08
 
 ### Changed
 
-- Default keys are now `Super+S` (show or hide the overlay) and
-  `Ctrl+Super+S` (add or release the focused window), previously
-  `Super+Q` and `Super+Shift+Q`. Keys you set yourself are kept.
-- GNOME binds `Super+S` to quick settings by default; `install.sh` reports
-  this, and the README explains how to free the key.
+- Default shortcuts are now `Super+S` (show or hide the overlay) and
+  `Ctrl+Super+S` (add or release the focused window), replacing `Super+Q`
+  and `Super+Shift+Q`. Shortcuts you set yourself are kept.
+- `install.sh` reports when GNOME's quick settings still use `Super+S`.
+  The README explains how to free the key.
+- Restructured README, CONTRIBUTING, RELEASE and SECURITY.
 
-## 1.3.1 — 2026-11-08
+## [1.3.1] — 2026-11-08
 
 ### Fixed
 
-- Remove scratchpad keybindings while the session is locked and restore them
-  on unlock. Hide the overlay on lock while retaining scratchpad membership.
-- Do not open the overlay if a terminal finishes starting while locked;
+- Remove the shortcuts while the session is locked and restore them on unlock.
+  Hide the overlay on lock and keep scratchpad membership.
+- Do not open the overlay when a terminal finishes starting while locked;
   park its window instead.
-- Cancel the terminal-process wait on launch completion, timeout or disable
-  without terminating the terminal, and consume the async result.
-- Update dimming immediately when a window on another monitor joins an open
-  overlay. A native regression test reproduces the failure without this fix.
-- Explicitly detach blur effects and stop dimmer transitions during cleanup
-  and monitor-pane replacement.
+- Cancel the terminal-process wait on launch, timeout or disable without
+  killing the terminal.
+- Update dimming at once when a window on another monitor joins the open
+  overlay.
+- Detach blur effects and stop dimmer transitions during cleanup and monitor
+  changes.
 
-### Release preparation
+### Added
 
-- Package only an explicit list of runtime files and the license.
-- Validate the upload ZIP, matching package/metadata/lockfile versions and
-  generate a SHA-256 checksum. Retain ZIP and checksum as CI artifacts.
-- Document security boundaries, contribution checks, review rationale and
-  the remaining manual acceptance tests for the GNOME Extensions submission.
-- Add six package regression tests and a private headless GNOME 51 suite with
-  13 real GJS/Mutter/GTK scenarios, clean/upgrade install reports and screenshot.
-- Check shell scripts with ShellCheck in CI.
+- Package validation: explicit file allowlist, version consistency checks and
+  a SHA-256 checksum. CI keeps the ZIP and checksum as artifacts.
+- Six package regression tests and a headless GNOME 51 test suite with 13
+  scenarios.
+- ShellCheck in CI.
+- Security policy, contribution guide and release checklist.
 
-## 1.3.0 — 2026-11-08
+## [1.3.0] — 2026-11-08
 
-- Add preferences for shortcuts, behaviour, terminal, dimming, blur and tiling.
+### Added
+
+- Preferences window for shortcuts, behaviour, terminal, dimming, blur and
+  tiling.
+
+### Fixed
+
 - Put new background windows below the dimmer immediately, without a flash.
-- Redraw blur when background content changes to avoid dark marks.
+- Redraw blur when background content changes, avoiding dark marks.
 
-## 1.2.1 — 2026-11-08
+## [1.2.1] — 2026-11-08
 
-- Prepare the upload for extensions.gnome.org: avoid APIs removed in GNOME 49
-  and omit the compiled schema from the release ZIP.
+### Fixed
 
-## 1.2.0 — 2026-11-08
+- Avoid APIs removed in GNOME 49 and leave the compiled schema out of the
+  release ZIP, as required by extensions.gnome.org.
 
-- Hide on focus loss to a window outside the scratchpad; ignore scratchpad
-  dialogs. Add the `hide-on-focus-loss` setting.
+## [1.2.0] — 2026-11-08
 
-## 1.1.0 — 2026-11-08
+### Added
+
+- Hide the overlay when a window outside the scratchpad gets focus; dialogs of
+  scratchpad windows do not count. New setting `hide-on-focus-loss`.
+
+## [1.1.0] — 2026-11-08
+
+### Added
+
+- Dim every monitor that shows a scratchpad window.
+
+### Fixed
 
 - Keep membership when dragging windows between monitors.
-- Dim each monitor containing a scratchpad window.
 
-## 1.0.1 — 2026-11-08
+## [1.0.1] — 2026-11-08
 
-- Fix dark trails when moving a window over the blurred background.
+### Fixed
 
-## 1.0.0 — 2026-11-08
+- Dark trails when moving a window over the blurred background.
 
-- First public release: animated overlay, terminal launch, configurable keys,
-  optional tiling and restoration of window state on release.
+## [1.0.0] — 2026-11-08
 
-[Published GitHub releases](https://github.com/exclude-barrier/scratchpad/releases)
+First release: animated overlay, terminal launch, configurable shortcuts,
+optional tiling and restoration of window state on release.
+
+[Unreleased]: https://github.com/exclude-barrier/scratchpad/compare/v1.3.2...HEAD
+[1.3.2]: https://github.com/exclude-barrier/scratchpad/compare/v1.3.1...v1.3.2
+[1.3.1]: https://github.com/exclude-barrier/scratchpad/compare/v1.3.0...v1.3.1
+[1.3.0]: https://github.com/exclude-barrier/scratchpad/compare/v1.2.1...v1.3.0
+[1.2.1]: https://github.com/exclude-barrier/scratchpad/compare/v1.2.0...v1.2.1
+[1.2.0]: https://github.com/exclude-barrier/scratchpad/compare/v1.1.0...v1.2.0
+[1.1.0]: https://github.com/exclude-barrier/scratchpad/compare/v1.0.1...v1.1.0
+[1.0.1]: https://github.com/exclude-barrier/scratchpad/compare/v1.0.0...v1.0.1
+[1.0.0]: https://github.com/exclude-barrier/scratchpad/releases/tag/v1.0.0
