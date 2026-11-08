@@ -264,6 +264,8 @@ export default class ScratchpadExtension extends Extension {
                     this._release(win, { leftAllWorkspaces: true });
             }),
             win.connect('notify::minimized', () => this._onMinimizedChanged(win)),
+            win.connect('position-changed', () => this._redrawBlur()),
+            win.connect('size-changed', () => this._redrawBlur()),
         ];
         this._windows.set(win, member);
         // Every window keeps the position and size you give it, including
@@ -450,6 +452,15 @@ export default class ScratchpadExtension extends Extension {
         } else if (!wantBlur && blur) {
             this.dimmer.remove_effect(blur);
         }
+    }
+
+    // BACKGROUND blur reads back what is already on screen. When a window
+    // moves, mutter repaints only the damaged area, so the blur would mix in
+    // stale or black pixels around it and leave a dark trail. Repaint the
+    // whole dimmer instead.
+    private _redrawBlur(): void {
+        if (this._shown && this._dimmer?.get_effect('blur'))
+            this._dimmer.queue_redraw();
     }
 
     private _placeDimmer(): void {
