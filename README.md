@@ -96,7 +96,9 @@ rm -rf ~/.local/share/gnome-shell/extensions/scratchpad@exclude-barrier.github.i
 
 ## Settings
 
-There is no preferences window yet. Use `gsettings`:
+Open the settings from the Extensions app, or run
+`gnome-extensions prefs scratchpad@exclude-barrier.github.io`. Everything can
+also be set with `gsettings`:
 
 ```
 S=~/.local/share/gnome-shell/extensions/scratchpad@exclude-barrier.github.io/schemas
@@ -140,6 +142,7 @@ gsettings --schemadir $S set org.gnome.shell.extensions.scratchpad terminal-comm
 
 ```
 src/extension.ts      the extension
+src/prefs.ts          preferences window (GTK 4, libadwaita)
 src/compat.ts         differences between GNOME versions
 src/geometry.ts       pure geometry (overlay, tiles, monitor index), testable without GNOME
 test/                 unit tests for geometry.ts (node:test)

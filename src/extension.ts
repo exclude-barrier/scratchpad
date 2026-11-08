@@ -100,6 +100,8 @@ export default class ScratchpadExtension extends Extension {
     // Full-stage container, not reactive; holds one dim pane per monitor.
     private _dimmer: St.Widget | null = null;
     private _panes: St.Widget[] = [];
+    // Window actors watched for damage while the overlay is open.
+    private _damageIds = new Map<Meta.WindowActor, number[]>();
     private _idleIds = new Set<number>();
     private _bindings: Binding[] = [];
     private _signals: [GObjectLike, number][] = [];
@@ -157,6 +159,8 @@ export default class ScratchpadExtension extends Extension {
             () => this._syncDimmerStack()));
         this._connect(global.display, global.display.connect('window-entered-monitor',
             (_d: Meta.Display, index: number, win: Meta.Window) => this._onEnteredMonitor(win, index)));
+        this._connect(global.window_group, global.window_group.connect('child-added',
+            (_g: Clutter.Actor, actor: Clutter.Actor) => this._onActorAdded(actor)));
         this._connect(global.display, global.display.connect('notify::focus-window',
             () => this._onFocusChanged()));
         this._connect(global.workspace_manager, global.workspace_manager.connect(
@@ -212,6 +216,7 @@ export default class ScratchpadExtension extends Extension {
         this._placed.clear();
         this._shown = false;
 
+        this._unwatchDamage();
         this._dimmer?.destroy();
         this._dimmer = null;
         this._panes = [];
@@ -328,13 +333,49 @@ export default class ScratchpadExtension extends Extension {
         if (!this._shown || !this.settings.get_boolean('hide-on-focus-loss'))
             return;
         const win = global.display.get_focus_window();
-        if (!win)
-            return;
+        if (win && !this._belongsToScratchpad(win))
+            this._hide();
+    }
+
+    // An overlay window or a dialog of one.
+    private _belongsToScratchpad(win: Meta.Window): boolean {
         for (let w: Meta.Window | null = win; w; w = w.get_transient_for()) {
             if (this._windows.has(w))
-                return;
+                return true;
         }
-        this._hide();
+        return false;
+    }
+
+    // mutter adds a new window actor on top of the window group and sorts it
+    // in only on its next restack. A window opening behind the open overlay
+    // would show above the dimmer until then, playing its map animation
+    // there. Put it below the dimmer at once and skip the animation.
+    private _onActorAdded(actor: Clutter.Actor): void {
+        if (!this._shown || !(actor instanceof Meta.WindowActor))
+            return;
+        this._watchDamage(actor);
+        const win = actor.meta_window;
+        if (!win || win.is_override_redirect() || win.is_above() || this._belongsToScratchpad(win))
+            return;
+        Main.wm.skipNextEffect(actor);
+        global.window_group.set_child_below_sibling(actor, this.dimmer);
+    }
+
+    // While the overlay is open, any change to a window repaints the whole
+    // blur (see _redrawBlur), not only the changed area.
+    private _watchDamage(actor: Meta.WindowActor): void {
+        if (this._damageIds.has(actor))
+            return;
+        this._damageIds.set(actor, [
+            actor.connect('damaged', () => this._redrawBlur()),
+            actor.connect('destroy', () => this._damageIds.delete(actor)),
+        ]);
+    }
+
+    private _unwatchDamage(): void {
+        for (const [actor, ids] of this._damageIds)
+            ids.forEach(id => actor.disconnect(id));
+        this._damageIds.clear();
     }
 
     private _forget(win: Meta.Window): void {
@@ -553,11 +594,11 @@ export default class ScratchpadExtension extends Extension {
     }
 
     // BACKGROUND blur reads back what is already on screen. When a window
-    // moves, mutter repaints only the damaged area, so the blur would mix in
-    // stale or black pixels around it and leave a dark trail. Repaint the
-    // whole dimmer instead.
+    // moves or changes, mutter repaints only the damaged area, so the blur
+    // would mix in stale or black pixels around it and leave dark marks.
+    // Repaint the whole dimmer instead.
     private _redrawBlur(): void {
-        if (this._shown && this.settings.get_boolean('blur'))
+        if (this._dimmer?.visible && this.settings.get_boolean('blur'))
             this._panes.forEach(p => p.visible && p.queue_redraw());
     }
 
@@ -580,6 +621,8 @@ export default class ScratchpadExtension extends Extension {
         const d = this.dimmer;
         d.remove_all_transitions();
         if (shown) {
+            for (const actor of global.get_window_actors())
+                this._watchDamage(actor);
             this._syncPanes();
             d.show();
             this._syncDimmerStack();
@@ -589,7 +632,10 @@ export default class ScratchpadExtension extends Extension {
                 opacity: 0,
                 duration: DIM_FADE_MS,
                 mode: Clutter.AnimationMode.EASE_IN_QUAD,
-                onComplete: () => d.hide(),
+                onComplete: () => {
+                    d.hide();
+                    this._unwatchDamage();
+                },
             });
         }
     }
