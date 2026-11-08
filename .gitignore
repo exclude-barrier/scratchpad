@@ -2,3 +2,4 @@ node_modules/
 build/
 gschemas.compiled
 deploy.env
+__pycache__/

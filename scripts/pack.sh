@@ -13,6 +13,10 @@ ZIP=$PWD/build/$UUID.shell-extension.zip
 
 rm -f "$ZIP"
 cp LICENSE "$SRC/"
-(cd "$SRC" && zip -qr "$ZIP" . -x 'schemas/gschemas.compiled')
-rm "$SRC/LICENSE"
+trap 'rm -f "$SRC/LICENSE"' EXIT
+# Explicit allowlist: stale output, source maps and local files must never
+# enter an upload. -X omits platform-specific extra file attributes.
+(cd "$SRC" && zip -Xq "$ZIP" \
+    extension.js prefs.js compat.js geometry.js metadata.json LICENSE \
+    schemas/org.gnome.shell.extensions.scratchpad.gschema.xml)
 echo "Packed $ZIP"

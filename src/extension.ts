@@ -22,9 +22,9 @@
 //
 // The extension stays enabled on the lock screen (session-modes in
 // metadata.json): GNOME otherwise disables it on every lock, which would
-// drop all parked windows out of the scratchpad. disable() therefore only
-// runs when the extension is really turned off, and then gives every window
-// back its state from before it joined.
+// drop all parked windows out of the scratchpad. Shell may still disable the
+// extension during a session-mode change; disable() always gives every window
+// back its state from before it joined and fully cleans up.
 //
 // Calls whose API differs between GNOME versions go through ./compat.js,
 // pure geometry lives in ./geometry.js.
@@ -106,6 +106,7 @@ export default class ScratchpadExtension extends Extension {
     private _bindings: Binding[] = [];
     private _signals: [GObjectLike, number][] = [];
     private _launchTimeoutId = 0;
+    private _launchCancellable: Gio.Cancellable | null = null;
     // Bumped per launch, so callbacks of an older terminal cannot end the
     // lock of a newer one.
     private _launchGeneration = 0;
@@ -136,22 +137,9 @@ export default class ScratchpadExtension extends Extension {
         global.window_group.add_child(this._dimmer);
         this._createPanes();
 
-        // NORMAL | OVERVIEW only: the keys do nothing on the lock screen.
-        this._bindings = [
-            ['toggle-scratchpad', () => this._toggle()],
-            ['move-to-scratchpad', () => this._toggleMembership()],
-        ];
-        for (const [name, handler] of this._bindings) {
-            const action = Main.wm.addKeybinding(
-                name,
-                this.settings,
-                Meta.KeyBindingFlags.NONE,
-                Shell.ActionMode.NORMAL | Shell.ActionMode.OVERVIEW,
-                handler
-            );
-            if (action === Meta.KeyBindingAction.NONE)
-                console.warn(`scratchpad: keybinding ${name} could not be grabbed`);
-        }
+        this._syncKeybindings();
+        this._connect(Main.sessionMode, Main.sessionMode.connect('updated',
+            () => this._syncKeybindings()));
 
         this._connect(global.display, global.display.connect('window-created',
             (_d: Meta.Display, win: Meta.Window) => this._watchNewWindow(win)));
@@ -189,15 +177,13 @@ export default class ScratchpadExtension extends Extension {
             this._show();
     }
 
-    // The keybindings are limited to NORMAL | OVERVIEW and do nothing on the
-    // lock screen. session-modes includes unlock-dialog because GNOME would
-    // otherwise call disable() on every screen lock, and all windows parked
-    // in the scratchpad would drop out of it. So disable() only runs when
-    // the extension is really turned off or the user session ends.
+    // Keybindings are removed while locked. session-modes includes
+    // unlock-dialog because GNOME would otherwise call disable() on every
+    // screen lock, and all windows parked
+    // in the scratchpad would drop out of it. Still clean up fully whenever
+    // Shell calls disable(), including during session-mode changes.
     disable(): void {
-        for (const [name] of this._bindings)
-            Main.wm.removeKeybinding(name);
-        this._bindings = [];
+        this._removeKeybindings();
 
         for (const [obj, id] of this._signals)
             obj.disconnect(id);
@@ -217,6 +203,10 @@ export default class ScratchpadExtension extends Extension {
         this._shown = false;
 
         this._unwatchDamage();
+        // Detach native effects while Shell's stage/global still exist;
+        // destroyed actors may otherwise retain them until a later GC.
+        this._panes.forEach(pane => pane.clear_effects());
+        this._dimmer?.remove_all_transitions();
         this._dimmer?.destroy();
         this._dimmer = null;
         this._panes = [];
@@ -225,6 +215,48 @@ export default class ScratchpadExtension extends Extension {
 
     private _connect(obj: GObjectLike, id: number): void {
         this._signals.push([obj, id]);
+    }
+
+    private _removeKeybindings(): void {
+        for (const [name] of this._bindings)
+            Main.wm.removeKeybinding(name);
+        this._bindings = [];
+    }
+
+    private _isUserSession(): boolean {
+        // SessionMode merges these fields at runtime. @girs currently omits
+        // them because its mapped type only includes fields shared by all modes.
+        const session = Main.sessionMode as typeof Main.sessionMode & {
+            isLocked: boolean;
+            parentMode: string | null;
+        };
+        return !session.isLocked &&
+            (session.currentMode === 'user' || session.parentMode === 'user');
+    }
+
+    private _syncKeybindings(): void {
+        if (!this._isUserSession()) {
+            this._removeKeybindings();
+            this._hide();
+            return;
+        }
+        if (this._bindings.length > 0)
+            return;
+        this._bindings = [
+            ['toggle-scratchpad', () => this._toggle()],
+            ['move-to-scratchpad', () => this._toggleMembership()],
+        ];
+        for (const [name, handler] of this._bindings) {
+            const action = Main.wm.addKeybinding(
+                name,
+                this.settings,
+                Meta.KeyBindingFlags.NONE,
+                Shell.ActionMode.NORMAL | Shell.ActionMode.OVERVIEW,
+                handler
+            );
+            if (action === Meta.KeyBindingAction.NONE)
+                console.warn(`scratchpad: keybinding ${name} could not be grabbed`);
+        }
     }
 
     // ---- new windows ------------------------------------------------------
@@ -544,7 +576,10 @@ export default class ScratchpadExtension extends Extension {
 
     // One pane per monitor, so the dimmed area can follow the windows.
     private _createPanes(): void {
-        this._panes.forEach(p => p.destroy());
+        this._panes.forEach(p => {
+            p.clear_effects();
+            p.destroy();
+        });
         this.dimmer.set_position(0, 0);
         this.dimmer.set_size(global.stage.width, global.stage.height);
         this._panes = Main.layoutManager.monitors.map(mon => {
@@ -681,6 +716,12 @@ export default class ScratchpadExtension extends Extension {
     }
 
     private _show(): void {
+        // A terminal may finish opening after the screen was locked.
+        if (!this._isUserSession()) {
+            for (const win of this._windows.keys())
+                this._minimize(win);
+            return;
+        }
         if (Main.overview.visible)
             Main.overview.hide();
         this._monitor = this._monitorIndex(global.display.get_current_monitor());
@@ -731,6 +772,7 @@ export default class ScratchpadExtension extends Extension {
         if (this._shown) {
             // Overlay is open: the window joins it.
             this._layout(false);
+            this._syncPanes();
             this._slideIn(win, this._slideDistance(win));
             return;
         }
@@ -760,12 +802,21 @@ export default class ScratchpadExtension extends Extension {
             return false;
         }
         const generation = ++this._launchGeneration;
+        const cancellable = new Gio.Cancellable();
+        this._launchCancellable = cancellable;
         this._launchTimeoutId = GLib.timeout_add_seconds(GLib.PRIORITY_DEFAULT,
             TERMINAL_LAUNCH_TIMEOUT_S, () => {
                 this._launchTimeoutId = 0;
+                this._endTerminalLaunch();
                 return GLib.SOURCE_REMOVE;
             });
-        proc.wait_async(null, () => {
+        proc.wait_async(cancellable, (_proc, result) => {
+            try {
+                proc.wait_finish(result);
+            } catch (e) {
+                if (!cancellable.is_cancelled())
+                    console.error('scratchpad: cannot wait for terminal', e);
+            }
             if (generation === this._launchGeneration)
                 this._endTerminalLaunch();
         });
@@ -777,6 +828,11 @@ export default class ScratchpadExtension extends Extension {
             GLib.source_remove(this._launchTimeoutId);
             this._launchTimeoutId = 0;
         }
+        // Stop watching, not the user's terminal. Otherwise wait_async can
+        // retain this extension for the entire lifetime of a terminal process.
+        const cancellable = this._launchCancellable;
+        this._launchCancellable = null;
+        cancellable?.cancel();
     }
 }
 
