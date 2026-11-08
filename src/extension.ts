@@ -185,6 +185,11 @@ export default class ScratchpadExtension extends Extension {
             this._show();
     }
 
+    // The keybindings are limited to NORMAL | OVERVIEW and do nothing on the
+    // lock screen. session-modes includes unlock-dialog because GNOME would
+    // otherwise call disable() on every screen lock, and all windows parked
+    // in the scratchpad would drop out of it. So disable() only runs when
+    // the extension is really turned off or the user session ends.
     disable(): void {
         for (const [name] of this._bindings)
             Main.wm.removeKeybinding(name);

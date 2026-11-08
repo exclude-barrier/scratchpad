@@ -151,8 +151,15 @@ deploy.sh             optional helper: build and install on a remote machine via
 ```
 
 `npm run check` type-checks, `npm test` runs the unit tests, `npm run build`
-writes the extension to `build/scratchpad@exclude-barrier.github.io`. CI runs
-`npm audit`, the type check, the tests and the build on every push.
+writes the extension to `build/scratchpad@exclude-barrier.github.io`, and
+`npm run pack` also packs `build/scratchpad@exclude-barrier.github.io.shell-extension.zip`
+for a release or extensions.gnome.org (without the compiled schema; GNOME
+compiles it on install). CI runs `npm audit`, the type check, the tests and
+the build on every push.
+
+Before an upload to extensions.gnome.org, check the zip with
+[shexli](https://pypi.org/project/shexli/):
+`uvx shexli build/scratchpad@exclude-barrier.github.io.shell-extension.zip`.
 
 Window behaviour (adding, releasing, animations) needs a running GNOME Shell
 and is not tested automatically.
@@ -162,8 +169,10 @@ and is not tested automatically.
 The code is type-checked against the newest GNOME (`@girs/gnome-shell`).
 Every call whose API differs in an older version goes through
 `src/compat.ts`. Today that is only maximizing: mutter 49 replaced
-`get_maximized()`, `maximize(flags)`, `unmaximize(flags)` and
-`MaximizeFlags.BOTH` with `is_maximized()`, `maximize()` and `unmaximize()`.
+`maximize(flags)` and `unmaximize(flags)` with `maximize()` and
+`unmaximize()`, dropped `MaximizeFlags.BOTH` and removed `get_maximized()`.
+The maximized state is read from the `maximized-horizontally` and
+`maximized-vertically` properties, which exist in every supported version.
 
 gnome-shell's `ease()` needs `translation_y` in snake_case: it finds the
 running transition by that key. The types only allow `translationY`, with

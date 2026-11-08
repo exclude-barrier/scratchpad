@@ -1,13 +1,14 @@
 {
   "name": "scratchpad",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "private": true,
   "description": "Drop-down scratchpad overlay extension for GNOME Shell 46-51",
   "type": "module",
   "scripts": {
     "check": "tsc --noEmit",
     "test": "tsc -p tsconfig.test.json && node --test build/test/test/*.test.js",
-    "build": "tsc && bash scripts/assemble.sh"
+    "build": "tsc && bash scripts/assemble.sh",
+    "pack": "npm run build && bash scripts/pack.sh"
   },
   "devDependencies": {
     "@girs/gjs": "5.6.0",

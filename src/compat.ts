@@ -11,10 +11,9 @@
 
 import Meta from 'gi://Meta';
 
-// mutter 49 (GNOME 49) replaced get_maximized()/unmaximize(flags) with
-// is_maximized()/unmaximize() and dropped MaximizeFlags.BOTH.
+// mutter 49 (GNOME 49) replaced maximize(flags)/unmaximize(flags) with
+// maximize()/unmaximize() and dropped MaximizeFlags.BOTH.
 interface LegacyMaximizeWindow {
-    get_maximized(): number;
     unmaximize(directions: number): void;
     maximize(directions: number): void;
 }
@@ -25,10 +24,10 @@ function hasModernMaximize(win: Meta.Window): boolean {
     return typeof (win as Partial<Meta.Window>).is_maximized === 'function';
 }
 
+// The maximized-horizontally/-vertically properties exist in every
+// supported version, unlike get_maximized() (removed in 49).
 export function isMaximized(win: Meta.Window): boolean {
-    if (hasModernMaximize(win))
-        return win.is_maximized();
-    return (win as unknown as LegacyMaximizeWindow).get_maximized() !== 0;
+    return win.maximized_horizontally || win.maximized_vertically;
 }
 
 export function unmaximize(win: Meta.Window): void {
