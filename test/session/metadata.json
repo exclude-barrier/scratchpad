@@ -1,0 +1,7 @@
+{
+  "uuid": "scratchpad-release-tests@local",
+  "name": "Scratchpad isolated release tests",
+  "description": "Test driver for the disposable headless release test session. Never distribute with Scratchpad.",
+  "shell-version": ["51"],
+  "session-modes": ["user", "unlock-dialog"]
+}

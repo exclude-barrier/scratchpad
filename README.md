@@ -2,6 +2,10 @@
 
 A drop-down scratchpad overlay for GNOME Shell 46–51.
 
+[Releases](https://github.com/exclude-barrier/scratchpad/releases) ·
+[Changelog](CHANGELOG.md) · [Contributing](CONTRIBUTING.md) ·
+[Release checklist](RELEASE.md) · [Security](SECURITY.md)
+
 Press `Super+Q` and an overlay slides up from the bottom over the current
 workspace, with everything underneath dimmed and blurred. If the scratchpad is
 empty, it starts a terminal. Add any window to it, and the window stays there,
@@ -41,22 +45,29 @@ option is on. The same goes for the dock's `Super+Shift+1..4` app keys.
   on all workspaces, and maximized or fullscreen if tiling removed that.
 - The extension stays enabled on the lock screen. Otherwise GNOME would turn
   it off on every lock and all parked windows would drop out of the
-  scratchpad. The keys do nothing on the lock screen.
+  scratchpad. On lock, the overlay hides and its shortcuts are removed;
+  unlocking registers them again without automatically opening the overlay.
 - When the extension is turned off, all hidden windows come back.
 
 ## Requirements
 
-- GNOME Shell 46–51. Only 51 is tested on a real session; 46–50 are checked
-  against their type definitions and source code.
+- GNOME Shell 46–51 is declared in the metadata. Release 1.3.1 is integration-
+  tested on GNOME 51 with two virtual Wayland monitors, real GTK preferences
+  and Ghostty. Versions 46–50 have API/source checks, not session-test results.
+  Physical-input and authenticated screen-lock tests remain manual; see
+  [release validation](RELEASE.md).
 - A terminal that can set its own WM class. The default is
   [Ghostty](https://ghostty.org). Without one, `Super+Q` on an empty
   scratchpad shows the empty overlay.
-- To build from source: Node.js 24, `glib-compile-schemas` and `zip`.
+- To build from source: Node.js 24 with npm, `glib-compile-schemas` and `zip`.
+  Package validation also needs `unzip` (Debian/Ubuntu packages:
+  `libglib2.0-bin zip unzip`). Node.js is not needed to run the extension.
 
 ## Installation
 
 From a release: download `scratchpad@exclude-barrier.github.io.shell-extension.zip`
-from the [latest release](https://github.com/exclude-barrier/scratchpad/releases/latest), then
+from the [latest release](https://github.com/exclude-barrier/scratchpad/releases/latest)
+(not GitHub's source-code ZIP), then
 
 ```
 gnome-extensions install --force scratchpad@exclude-barrier.github.io.shell-extension.zip
@@ -78,12 +89,19 @@ npm run build
 Then log out and back in: GNOME Shell loads new extensions only at login.
 Updates also need a new login.
 
+The source installer additionally installs a hidden desktop entry for the
+default Ghostty terminal's dock icon and enables the extension in GSettings.
+The release ZIP intentionally contains neither the installer nor that desktop
+entry; it is not required for the overlay or terminal launch to work.
+
 `./install.sh --workspace-keys` also binds `Super+Shift+1..4` to "move window
 to workspace 1..4". It only adds these keys and keeps existing bindings, and
 it reports other actions that use the same keys.
 
 `./install.sh --rollback` puts the previously installed version back. It is
 kept in `~/.local/share/scratchpad/previous`.
+This backup is made by the source installer, not by `gnome-extensions install`.
+The extension and backup paths respect `XDG_DATA_HOME` when set.
 
 To uninstall:
 
@@ -105,8 +123,8 @@ Everything can also be set with `gsettings`:
 
 ```
 S=~/.local/share/gnome-shell/extensions/scratchpad@exclude-barrier.github.io/schemas
-gsettings --schemadir $S list-recursively org.gnome.shell.extensions.scratchpad
-gsettings --schemadir $S set org.gnome.shell.extensions.scratchpad tile-windows true
+gsettings --schemadir "$S" list-recursively org.gnome.shell.extensions.scratchpad
+gsettings --schemadir "$S" set org.gnome.shell.extensions.scratchpad tile-windows true
 ```
 
 | Key | Default | Meaning |
@@ -133,15 +151,21 @@ With `gsettings`:
 
 ```
 # Ghostty (default)
-gsettings --schemadir $S set org.gnome.shell.extensions.scratchpad terminal-command \
+gsettings --schemadir "$S" set org.gnome.shell.extensions.scratchpad terminal-command \
   "['ghostty', '--class=io.github.exclude_barrier.Scratchpad', '--gtk-single-instance=false']"
 # Alacritty
-gsettings --schemadir $S set org.gnome.shell.extensions.scratchpad terminal-command \
+gsettings --schemadir "$S" set org.gnome.shell.extensions.scratchpad terminal-command \
   "['alacritty', '--class', 'io.github.exclude_barrier.Scratchpad']"
 # kitty
-gsettings --schemadir $S set org.gnome.shell.extensions.scratchpad terminal-command \
-  "['kitty', '--class', 'io.github.exclude_barrier.Scratchpad']"
+gsettings --schemadir "$S" set org.gnome.shell.extensions.scratchpad terminal-command \
+   "['kitty', '--class', 'io.github.exclude_barrier.Scratchpad']"
 ```
+
+The command is an argument list, not a shell script. Pipes, redirects,
+environment-variable expansion and `~` expansion are not performed. Use only
+commands you trust; see [SECURITY.md](SECURITY.md). Window membership is kept
+in memory, not saved across logout. On enable, matching terminal windows can
+be adopted again, but arbitrary windows must be added again.
 
 ## Development
 
@@ -150,11 +174,14 @@ src/extension.ts      the extension
 src/prefs.ts          preferences window (GTK 4, libadwaita)
 src/compat.ts         differences between GNOME versions
 src/geometry.ts       pure geometry (overlay, tiles, monitor index), testable without GNOME
-test/                 unit tests for geometry.ts (node:test)
+test/                 geometry and package regression tests (node:test)
+test/session/         real GNOME/GTK integration driver; never included in ZIP
 src/ambient.d.ts      types for GJS and GNOME Shell (@girs)
 extension/<uuid>/     metadata.json and GSettings schema
 scripts/assemble.sh   builds build/<uuid> from compiled JS, metadata and schema
 scripts/pack.sh       packs build/<uuid> into the release zip
+scripts/check-package.mjs validates ZIP contents and versions; writes SHA-256
+scripts/test-session.py runs ZIP tests in a private headless GNOME session
 data/                 desktop entry for the scratchpad terminal
 deploy.sh             optional helper: build and install on a remote machine via an SSH jump host
 ```
@@ -163,21 +190,22 @@ deploy.sh             optional helper: build and install on a remote machine via
 writes the extension to `build/scratchpad@exclude-barrier.github.io`, and
 `npm run pack` also packs `build/scratchpad@exclude-barrier.github.io.shell-extension.zip`
 for a release or extensions.gnome.org (without the compiled schema; GNOME
-compiles it on install). CI runs `npm audit`, the type check, the tests and
-the build on every push and pull request; CodeQL scans the code.
+compiles it on install). `npm run check:release` type-checks, tests, builds,
+packs and validates the actual archive, then writes a `.zip.sha256` file.
+CI also runs `npm audit`, Bash syntax and ShellCheck, and keeps the ZIP and
+checksum as build artifacts. CodeQL is configured through GitHub default setup.
 
-Before an upload to extensions.gnome.org, check the zip with
-[shexli](https://pypi.org/project/shexli/). shexli 0.2.1 crashes with
-tree-sitter 0.26 and flags GNOME 51 as a future release (it only knows up to
-50); the second finding can be ignored:
+Before an upload, follow [RELEASE.md](RELEASE.md), including the independent
+shexli review and its documented GNOME-version limitation. Passing static
+checks is not evidence of successful GNOME runtime testing or EGO approval.
 
-```
-uvx --python 3.12 --with 'tree-sitter<0.26' shexli \
-  "$PWD/build/scratchpad@exclude-barrier.github.io.shell-extension.zip"
-```
-
-Window behaviour (adding, releasing, animations) needs a running GNOME Shell
-and is not tested automatically.
+`npm test` runs 13 geometry/package tests without GNOME. On a GNOME 51 test
+host, `npm run test:session` additionally installs the exact ZIP into a
+disposable HOME, private D-Bus and headless compositor with two virtual
+monitors. It tests 13 runtime scenarios, including real GTK preferences,
+membership, animation, lock-mode transitions and cleanup. Requirements and
+limitations are documented in [CONTRIBUTING.md](CONTRIBUTING.md#isolated-gnome-51-integration-tests).
+This optional suite is not run by the standard Ubuntu CI job.
 
 ### GNOME versions
 
@@ -229,14 +257,9 @@ Adding a new GNOME version:
 `main` is protected: changes go in through pull requests, squash-merged, with
 CI (`build`) and CodeQL passing. Force pushes and branch deletion are blocked.
 
-Release:
-
-1. Bump `version-name` in `metadata.json` and `version` in `package.json`,
-   run `npm install --package-lock-only`.
-2. Pull request, merge.
-3. `npm run pack`, check with shexli, then
-   `gh release create vX.Y.Z build/scratchpad@exclude-barrier.github.io.shell-extension.zip`
-   and upload the same zip to extensions.gnome.org.
+See [CONTRIBUTING.md](CONTRIBUTING.md) for checks and bug reports,
+[CHANGELOG.md](CHANGELOG.md) for release history, and
+[RELEASE.md](RELEASE.md) for packaging, manual acceptance tests and upload.
 
 Dependencies: Dependabot opens pull requests for npm and GitHub Actions
 updates, but they are never merged; CI fails on them on purpose. Apply the
