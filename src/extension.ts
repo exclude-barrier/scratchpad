@@ -15,6 +15,7 @@
 //                                            monitor with an overlay window
 //   blurs what is underneath              -> Shell.BlurEffect on the dimmer
 //   hides on workspace switch             -> active-workspace-changed hides it
+//   hides when another window gets focus  -> notify::focus-window hides it
 //   add a window without following it     -> the window slides away and is parked
 //   move it out with Super+Shift+1..4     -> leaving "all workspaces" releases it
 //   empty scratchpad                      -> starts terminal-command
@@ -156,6 +157,8 @@ export default class ScratchpadExtension extends Extension {
             () => this._syncDimmerStack()));
         this._connect(global.display, global.display.connect('window-entered-monitor',
             (_d: Meta.Display, index: number, win: Meta.Window) => this._onEnteredMonitor(win, index)));
+        this._connect(global.display, global.display.connect('notify::focus-window',
+            () => this._onFocusChanged()));
         this._connect(global.workspace_manager, global.workspace_manager.connect(
             'active-workspace-changed', () => {
                 if (this._shown && this.settings.get_boolean('hide-on-workspace-switch'))
@@ -312,6 +315,21 @@ export default class ScratchpadExtension extends Extension {
         member.monitor = index;
         if (this._shown)
             this._syncPanes();
+    }
+
+    // A click on (or Alt+Tab to) a window outside the scratchpad hides it.
+    // Dialogs of overlay windows do not count.
+    private _onFocusChanged(): void {
+        if (!this._shown || !this.settings.get_boolean('hide-on-focus-loss'))
+            return;
+        const win = global.display.get_focus_window();
+        if (!win)
+            return;
+        for (let w: Meta.Window | null = win; w; w = w.get_transient_for()) {
+            if (this._windows.has(w))
+                return;
+        }
+        this._hide();
     }
 
     private _forget(win: Meta.Window): void {

@@ -34,7 +34,9 @@ option is on. The same goes for the dock's `Super+Shift+1..4` app keys.
 - Multiple monitors: every monitor with an overlay window is dimmed. Drag a
   window to another monitor and it stays in the scratchpad; the dimming
   follows it.
-- The overlay hides when you switch workspace (`hide-on-workspace-switch`).
+- The overlay hides when you switch workspace (`hide-on-workspace-switch`)
+  and when a window outside the scratchpad gets focus, for example by a click
+  or Alt+Tab (`hide-on-focus-loss`). Dialogs of overlay windows do not count.
 - Releasing a window gives it back the state it had before: always on top,
   on all workspaces, and maximized or fullscreen if tiling removed that.
 - The extension stays enabled on the lock screen. Otherwise GNOME would turn
@@ -114,6 +116,7 @@ gsettings --schemadir $S set org.gnome.shell.extensions.scratchpad tile-windows 
 | `dim` | `0.6` | How dark the background gets, 0–1 |
 | `blur` | `true` | Blur the background. Turn off on slow GPUs |
 | `hide-on-workspace-switch` | `true` | Hide the overlay on workspace switch |
+| `hide-on-focus-loss` | `true` | Hide the overlay when another window gets focus |
 | `launch-terminal` | `true` | Start a terminal when the scratchpad is empty |
 | `terminal-command` | Ghostty, see below | Command that starts the terminal |
 | `terminal-class` | `'io.github.exclude_barrier.Scratchpad'` | WM class of the terminal window |
@@ -183,14 +186,15 @@ Adding a new GNOME version:
    windows are in the overlay, the second at its old position.
 5. Move or resize a window in the overlay, `Super+Q` twice: position stays.
 6. Overlay open, switch workspace: the overlay hides.
-7. Overlay open, window focused, `Super+Shift+Q`: the window is normal again.
-8. Window in the overlay, lock and unlock the screen: it is still in the scratchpad.
-9. Add and release a window set to "Always on Top": the setting is back.
-10. Two monitors, overlay open: drag a window to the other monitor and back.
+7. Overlay open, click a window outside it: the overlay hides.
+8. Overlay open, window focused, `Super+Shift+Q`: the window is normal again.
+9. Window in the overlay, lock and unlock the screen: it is still in the scratchpad.
+10. Add and release a window set to "Always on Top": the setting is back.
+11. Two monitors, overlay open: drag a window to the other monitor and back.
     It stays in the scratchpad, and the monitor it is on is dimmed.
-11. Press `Super+Q` quickly several times with an empty scratchpad: only one terminal starts.
-12. `tile-windows true`, add and release a maximized window: it is maximized again.
-13. Errors: `journalctl --user -b | grep -i scratchpad`.
+12. Press `Super+Q` quickly several times with an empty scratchpad: only one terminal starts.
+13. `tile-windows true`, add and release a maximized window: it is maximized again.
+14. Errors: `journalctl --user -b | grep -i scratchpad`.
 
 ## License
 

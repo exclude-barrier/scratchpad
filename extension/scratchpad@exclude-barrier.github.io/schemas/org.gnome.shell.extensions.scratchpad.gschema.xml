@@ -47,6 +47,10 @@
       <default>true</default>
       <summary>Hide the overlay when the workspace changes</summary>
     </key>
+    <key name="hide-on-focus-loss" type="b">
+      <default>true</default>
+      <summary>Hide the overlay when a window outside the scratchpad gets focus</summary>
+    </key>
     <key name="launch-terminal" type="b">
       <default>true</default>
       <summary>Start a terminal when the scratchpad is empty</summary>
