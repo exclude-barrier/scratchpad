@@ -1,130 +1,144 @@
 # Contributing
 
-Scratchpad is a TypeScript GNOME Shell extension. User-facing documentation
-and code comments are in English. Keep changes focused and document any
-observable behaviour change.
+Scratchpad is a GNOME Shell extension written in TypeScript. Documentation and
+code comments are in English. Keep changes focused and document every
+observable behaviour change in [CHANGELOG.md](CHANGELOG.md).
 
-## Development setup
+## Setup
 
-Use Node.js 24 with npm, `glib-compile-schemas`, `zip` and `unzip`.
-On Debian/Ubuntu the system tools are in `libglib2.0-bin zip unzip`.
+Needs Node.js 24 with npm, `glib-compile-schemas`, `zip` and `unzip`
+(Debian/Ubuntu: `libglib2.0-bin zip unzip`).
 
 ```sh
 npm ci
-npm run check:release
-npm audit --audit-level=high
-for script in install.sh deploy.sh scripts/*.sh; do
-  bash -n "$script"
-done
+npm run build    # writes build/scratchpad@exclude-barrier.github.io
+./install.sh     # installs into your own session; log out and in afterwards
 ```
 
-`check:release` performs the type check, 13 tests (seven geometry and six package
-regressions), build, packaging and archive validation. The geometry tests compile
-with `tsconfig.test.json`; package tests use native Node.js modules and temporary
-ZIP fixtures. Both use `node:test`, without GJS, GTK or Mutter. CI also runs
-ShellCheck at warning/error severity; the deployment helper's informational
-SC2029 messages describe intentional expansion of local SSH parameters.
+`install.sh` changes local files and enabled-extension settings.
+`--workspace-keys` also changes global window-manager shortcuts; `--rollback`
+restores extension files, not those shortcuts.
 
-## Isolated GNOME 51 integration tests
+## Checks
 
-On a Linux GNOME 51 test host, install `gnome-shell`, `gjs`, GTK 4/libadwaita,
-Ghostty, Python 3, `dbus-daemon`, and the GNOME Extensions CLI. The runner
-requires a usable headless EGL renderer (software rendering is requested).
-It creates a private D-Bus, disposable HOME/XDG directories and two virtual
-Wayland monitors. It does not install into or change the running desktop's
-settings. No private-bus service activation is allowed.
-System-bus requests are also redirected to the private bus, so the test
-compositor cannot register with the real GDM/logind session.
+| Command | What it does |
+|---|---|
+| `npm run check` | Type check |
+| `npm test` | 13 unit tests (geometry and package validation), no GNOME needed |
+| `npm run pack` | Build and pack `build/<uuid>.shell-extension.zip` |
+| `npm run check:package` | Validate the ZIP contents and versions, write the `.sha256` file |
+| `npm run check:release` | All of the above in order |
+| `npm run test:session` | Native GNOME 51 tests, see below |
+
+CI runs `check:release`, `npm audit --audit-level=high`, `bash -n` and
+ShellCheck on all shell scripts. CodeQL runs through GitHub's default setup.
+
+### Native GNOME 51 tests
+
+`npm run test:session` installs the built ZIP into a disposable HOME with a
+private D-Bus and a headless compositor with two virtual monitors. It never
+touches the running desktop. It runs 13 scenarios in real GJS/Mutter and GTK:
+preferences, terminal adoption, membership, animation, cross-monitor dimming,
+lock-mode transitions and cleanup.
+
+Requirements: GNOME Shell 51, `gjs`, GTK 4/libadwaita, Ghostty, Python 3,
+`dbus-daemon`, the `gnome-extensions` CLI and a headless EGL renderer.
 
 ```sh
 npm run pack
 npm run test:session
-# If dbus-daemon is not in PATH:
+# dbus-daemon not in PATH:
 npm run test:session -- --dbus-daemon /path/to/dbus-daemon
-# File upgrade from a previously downloaded 1.3.0 release ZIP:
-npm run test:session -- --upgrade-from /path/to/1.3.0.shell-extension.zip \
+# Upgrade over an older release ZIP:
+npm run test:session -- --upgrade-from /path/to/old.shell-extension.zip \
   --output build/session-upgrade-test
 ```
 
-The suite checks 13 scenarios under actual GJS/Mutter and a separate GTK
-process. It exercises the installed ZIP, preferences and shortcut recorder,
-terminal adoption, animations, cross-monitor dimming, `unlock-dialog`
-transitions, late windows, maximized/fullscreen restoration and cancellation
-of real Gio subprocess waits. Assertions call extension methods directly;
-they do not emulate physical shortcut delivery or PAM authentication.
-The driver uses private extension fields deliberately for lifecycle assertions
-and is never shipped in the extension ZIP.
+Reports, a screenshot and logs go to `build/session-test/` (or `--output`).
+Limits:
 
-Reports, a synthetic-desktop screenshot, and private-bus/Shell logs are kept in
-`build/session-test/` (or `--output`). Reports include the tested ZIP SHA-256,
-source commit, dirty status and installation mode. A file upgrade installs
-the old ZIP then replaces it before the fresh compositor starts; it is not an
-in-session reload of an old cached module. Missing desktop services can cause
-expected CalendarServer/portal warnings in this deliberately minimal session.
-Native GLib/GObject assertions were also observed during final compositor
-teardown; their cause is not established by this suite. A passed JSON report
-means the scripted operations passed, not that the entire Shell journal is
-clean. Inspect logs and repeat normal-session validation before EGO submission.
-The ordinary Ubuntu CI job runs only the Node
-tests, package validation and static checks, not this GNOME 51 suite.
+- Assertions call extension methods directly. Physical input and PAM
+  authentication are not tested.
+- Warnings about missing desktop services (CalendarServer, portals) are
+  expected in this minimal session.
+- The compositor emits GLib/GObject assertions during final shutdown, after
+  all scenarios pass. Their cause is not known.
+- CI does not run this suite.
 
-Also follow the physical/manual tests in [README.md](README.md#manual-test)
-and the EGO acceptance checks in [RELEASE.md](RELEASE.md).
+## Project layout
 
-## Local installation
+```text
+src/extension.ts          Shell side: lifecycle, membership, animation, dimming, terminal, keys
+src/prefs.ts              preferences window (GTK 4, libadwaita), separate process
+src/compat.ts             API differences between GNOME versions
+src/geometry.ts           pure geometry, unit-tested without GNOME
+src/ambient.d.ts          GJS and GNOME Shell types (@girs)
+extension/<uuid>/         metadata.json and GSettings schema
+test/                     unit tests (node:test)
+test/session/             native test driver, never shipped
+scripts/assemble.sh       builds build/<uuid>
+scripts/pack.sh           packs the release ZIP from an explicit file list
+scripts/check-package.mjs validates the ZIP, writes the checksum
+scripts/test-session.py   runs the native GNOME 51 tests
+data/                     desktop entry for the terminal's dock icon
+deploy.sh                 optional: build and install on a remote machine over SSH
+```
 
-Use `npm run build` and `./install.sh` only when you want to install into your
-own desktop session. Installation changes local files and enabled-extension
-settings. `--workspace-keys` also changes global window-manager shortcuts;
-rollback restores extension files, not those shortcut settings.
-The SSH deployment helpers are optional developer tools, not release dependencies.
+## Code rules
 
-## Code layout and review rules
+- Release every signal, timeout, actor and keybinding in `disable()`.
+- `prefs.ts` must not import Shell UI modules. Shell code must not import
+  GTK, GDK or libadwaita.
+- Route every API that differs between GNOME versions through `src/compat.ts`.
+- Add a regression test in `test/geometry.test.ts` for geometry fixes.
+- Update the settings table in the README when a setting or default changes.
+- Never minify or obfuscate the shipped JavaScript.
+- Do not commit `build/`, `node_modules/`, compiled schemas, credentials or
+  `deploy.env`.
+- Describe a manual test when a runtime change cannot be unit-tested.
 
-- `src/extension.ts`: GNOME Shell lifecycle, window membership, animations,
-  dimming, terminal launch and keybindings. Release every owned signal,
-  timeout, actor and binding in `disable()`.
-- `src/prefs.ts`: GTK 4/libadwaita preferences in a separate process. Do not
-  import Shell UI modules here, or GTK/GDK/libadwaita into Shell code.
-- `src/compat.ts`: version-specific Mutter APIs. A type check against GNOME
-  51 alone does not demonstrate compatibility with 46–50.
-- `src/geometry.ts` and `test/geometry.test.ts`: GNOME-independent geometry
-  and its unit tests. Add regression tests here for geometry fixes.
-- `test/package.test.mjs`: valid and intentionally invalid ZIP fixtures.
-- `test/session/` and `scripts/test-session.py`: disposable native-runtime tests.
-- `extension/<uuid>/`: release metadata and the GSettings schema. Update
-  README defaults whenever settings change.
-- `scripts/assemble.sh`, `scripts/pack.sh`, `scripts/check-package.mjs`:
-  readable JS build, explicit upload allowlist, and archive validation.
+See the [GNOME review guidelines](https://gjs.guide/extensions/review-guidelines/review-guidelines.html).
 
-Do not commit `build/`, `node_modules/`, compiled schemas, credentials or
-`deploy.env`. Never minify or obfuscate the submitted JavaScript. Runtime
-changes need a reproducible manual test description when unit testing cannot
-exercise them. See the [GNOME review guidelines](https://gjs.guide/extensions/review-guidelines/review-guidelines.html).
+### GNOME versions
 
-## Pull requests and dependencies
+The code is type-checked against the newest GNOME (`@girs/gnome-shell`). That
+alone does not prove compatibility with older versions. Today `compat.ts` only
+covers maximizing: mutter 49 replaced `maximize(flags)`/`unmaximize(flags)`
+with argument-free versions and removed `get_maximized()`. The state is read
+from the `maximized-horizontally` and `maximized-vertically` properties, which
+exist in every supported version.
 
-Open a pull request against `main`. Repository rules require the `build`
-check and CodeQL, resolved review conversations and linear history; changes
-are squash-merged. The rules also block force pushes and branch deletion.
-CodeQL uses GitHub's default setup, not a workflow in this repository.
+gnome-shell's `ease()` finds a running transition only by the snake_case key
+`translation_y`. The types allow only `translationY`, so `easeTranslation()`
+in `src/extension.ts` uses a cast.
 
-Dependabot pull requests are reminders only: the current CI intentionally
-fails for them. Apply the update in your own pull request rather than merging
-the bot's branch. Keep `@types/node` on the build's Node.js major (24).
-Update the lockfile together with dependency or package-version changes.
+To add a GNOME version:
+
+1. `npm install --save-dev --save-exact @girs/gnome-shell@<new>`
+2. `npm run check` and fix errors. Add a helper to `src/compat.ts` if older
+   versions still need the old API.
+3. Add the version to `shell-version` in `metadata.json` and test on it.
+
+## Pull requests
+
+Open a pull request against `main`. Merging requires the `build` check,
+CodeQL, resolved conversations and linear history; changes are squash-merged.
+Direct pushes, force pushes and branch deletion are blocked.
+
+Dependabot pull requests are reminders only, and CI fails on them on purpose.
+Apply the update in your own pull request; Dependabot then closes its own.
+Keep `@types/node` on the Node.js major used to build (24), and update the
+lockfile with every dependency or version change.
 
 ## Reporting bugs
 
-Use [GitHub Issues](https://github.com/exclude-barrier/scratchpad/issues) for
-non-security bugs. Include:
+Use [GitHub Issues](https://github.com/exclude-barrier/scratchpad/issues).
+Include:
 
 - Extension version and installation method (source, GitHub ZIP or EGO).
-- Distribution, `gnome-shell --version`, Wayland/X11, monitor layout and scaling.
-- Steps to reproduce, expected behaviour, actual behaviour and relevant settings.
-- Other enabled extensions, especially docks, tiling and window-management tools.
-- Relevant output from `journalctl --user -b | grep -i scratchpad`, with private
-  information removed.
+- Distribution, `gnome-shell --version`, Wayland/X11, monitors and scaling.
+- Steps to reproduce, expected and actual behaviour, changed settings.
+- Other enabled extensions, especially docks and tiling tools.
+- Output of `journalctl --user -b | grep -i scratchpad`, without private data.
 
-Use [SECURITY.md](SECURITY.md) instead for vulnerabilities. Release maintainers
-should follow [RELEASE.md](RELEASE.md); a successful build is not approval to publish.
+Report vulnerabilities privately instead, see [SECURITY.md](SECURITY.md).
