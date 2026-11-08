@@ -11,6 +11,29 @@ workspace, with everything underneath dimmed and blurred. If the scratchpad is
 empty, it starts a terminal. Add any window to it, and the window stays there,
 at the position and size you give it, until you release it.
 
+## Current release
+
+**[Scratchpad 1.3.1](https://github.com/exclude-barrier/scratchpad/releases/tag/v1.3.1)**
+was released on 2026-11-08.
+
+- [Download the installable extension ZIP](https://github.com/exclude-barrier/scratchpad/releases/download/v1.3.1/scratchpad%40exclude-barrier.github.io.shell-extension.zip)
+  · [SHA-256 checksum](https://github.com/exclude-barrier/scratchpad/releases/download/v1.3.1/scratchpad%40exclude-barrier.github.io.shell-extension.zip.sha256)
+- Fixes lock-mode shortcut handling, late terminal windows, terminal-wait cleanup
+  and dimming when adding a window on another monitor. See [CHANGELOG.md](CHANGELOG.md).
+- Validation: 13 Node tests and 13 native GNOME 51 scenarios passed for both
+  clean installation and a file upgrade over 1.3.0. Published evidence:
+  [clean install](https://github.com/exclude-barrier/scratchpad/releases/download/v1.3.1/session-clean.json),
+  [upgrade](https://github.com/exclude-barrier/scratchpad/releases/download/v1.3.1/session-upgrade.json),
+  [static review](https://github.com/exclude-barrier/scratchpad/releases/download/v1.3.1/shexli-report.json)
+  and [test-desktop screenshot](https://github.com/exclude-barrier/scratchpad/releases/download/v1.3.1/screenshot.png).
+
+**GNOME Extensions status:** this GitHub release does not establish approval
+on extensions.gnome.org; no approved listing is linked here yet. Install from
+the GitHub ZIP for now. GNOME 46–50 session tests and physical-input,
+authenticated lock-screen and normal-session journal checks remain outstanding.
+The static checker's GNOME 51 finding and native test-compositor shutdown
+assertions are documented in [RELEASE.md](RELEASE.md).
+
 ## Keys
 
 | Key | Action |
@@ -75,6 +98,13 @@ gnome-extensions install --force scratchpad@exclude-barrier.github.io.shell-exte
 
 log out and back in, and run
 `gnome-extensions enable scratchpad@exclude-barrier.github.io`.
+
+If you also downloaded the checksum, verify both files in the same directory
+before installation:
+
+```sh
+sha256sum -c scratchpad@exclude-barrier.github.io.shell-extension.zip.sha256
+```
 
 From source:
 
@@ -206,6 +236,27 @@ monitors. It tests 13 runtime scenarios, including real GTK preferences,
 membership, animation, lock-mode transitions and cleanup. Requirements and
 limitations are documented in [CONTRIBUTING.md](CONTRIBUTING.md#isolated-gnome-51-integration-tests).
 This optional suite is not run by the standard Ubuntu CI job.
+
+### Submitting to extensions.gnome.org
+
+For maintainers publishing the extension (not needed for local installation):
+
+1. Complete the remaining manual acceptance and compatibility checks in
+   [RELEASE.md](RELEASE.md#3-native-checks-and-remaining-manual-ego-acceptance).
+2. Open [Upload Extension](https://extensions.gnome.org/upload/) while signed in.
+3. Select `scratchpad@exclude-barrier.github.io.shell-extension.zip` from the
+   tested release. Use the installable asset, **not** GitHub's source-code ZIP,
+   a checksum file or the whole repository. A local build is under `build/`.
+4. Read the licensing and maintainership declarations and agree personally
+   if you accept them; then submit the ZIP for review.
+5. Provide the reviewer notes from [RELEASE.md](RELEASE.md#4-notes-for-the-ego-reviewer),
+   describe the testing limitations, and respond to review feedback. Approval
+   or rejection is reported by email. Add the install link here once approved.
+
+The website message `No such native application org.gnome.chrome_gnome_shell`
+concerns the browser's native connector for managing local extensions. It is
+not a ZIP-review result and does not by itself prevent uploading the ZIP.
+The connector is not required for the manual `gnome-extensions install` command.
 
 ### GNOME versions
 
