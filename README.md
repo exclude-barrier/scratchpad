@@ -31,6 +31,9 @@ option is on. The same goes for the dock's `Super+Shift+1..4` app keys.
 - By default windows are never moved or resized. With `tile-windows` on, the
   visible windows are laid out side by side in columns inside the overlay
   area (`height-percent`, `width-percent`, `gap-outer`, `gap-inner`).
+- Multiple monitors: every monitor with an overlay window is dimmed. Drag a
+  window to another monitor and it stays in the scratchpad; the dimming
+  follows it.
 - The overlay hides when you switch workspace (`hide-on-workspace-switch`).
 - Releasing a window gives it back the state it had before: always on top,
   on all workspaces, and maximized or fullscreen if tiling removed that.
@@ -183,9 +186,11 @@ Adding a new GNOME version:
 7. Overlay open, window focused, `Super+Shift+Q`: the window is normal again.
 8. Window in the overlay, lock and unlock the screen: it is still in the scratchpad.
 9. Add and release a window set to "Always on Top": the setting is back.
-10. Press `Super+Q` quickly several times with an empty scratchpad: only one terminal starts.
-11. `tile-windows true`, add and release a maximized window: it is maximized again.
-12. Errors: `journalctl --user -b | grep -i scratchpad`.
+10. Two monitors, overlay open: drag a window to the other monitor and back.
+    It stays in the scratchpad, and the monitor it is on is dimmed.
+11. Press `Super+Q` quickly several times with an empty scratchpad: only one terminal starts.
+12. `tile-windows true`, add and release a maximized window: it is maximized again.
+13. Errors: `journalctl --user -b | grep -i scratchpad`.
 
 ## License
 

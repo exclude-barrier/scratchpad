@@ -11,7 +11,8 @@
 //   overlays the current workspace        -> overlay windows are sticky + above
 //   windows keep their own size/position  -> default; tile-windows lays them
 //                                            out in columns instead
-//   dims what is underneath               -> dimmer actor below the overlay
+//   dims what is underneath               -> dimmer below the overlay, on every
+//                                            monitor with an overlay window
 //   blurs what is underneath              -> Shell.BlurEffect on the dimmer
 //   hides on workspace switch             -> active-workspace-changed hides it
 //   add a window without following it     -> the window slides away and is parked
@@ -57,6 +58,8 @@ interface Member {
     // Set when tiling took these away; release gives them back.
     restoreMaximized: boolean;
     restoreFullscreen: boolean;
+    // Last known monitor, to tell a monitor move from a workspace move.
+    monitor: number;
 }
 
 interface ReleaseOptions {
@@ -93,7 +96,10 @@ export default class ScratchpadExtension extends Extension {
     private _placed = new Set<Meta.Window>(); // windows that have their own geometry
     private _shown = false;
     private _monitor = 0;
+    // Full-stage container, not reactive; holds one dim pane per monitor.
     private _dimmer: St.Widget | null = null;
+    private _panes: St.Widget[] = [];
+    private _idleIds = new Set<number>();
     private _bindings: Binding[] = [];
     private _signals: [GObjectLike, number][] = [];
     private _launchTimeoutId = 0;
@@ -123,13 +129,9 @@ export default class ScratchpadExtension extends Extension {
         this._shown = false;
         this._monitor = global.display.get_current_monitor();
 
-        this._dimmer = new St.Widget({ reactive: true, visible: false, opacity: 0 });
-        this._dimmer.connect('button-press-event', () => {
-            this._hide();
-            return Clutter.EVENT_STOP;
-        });
+        this._dimmer = new St.Widget({ visible: false, opacity: 0 });
         global.window_group.add_child(this._dimmer);
-        this._updateDimmerStyle();
+        this._createPanes();
 
         // NORMAL | OVERVIEW only: the keys do nothing on the lock screen.
         this._bindings = [
@@ -152,6 +154,8 @@ export default class ScratchpadExtension extends Extension {
             (_d: Meta.Display, win: Meta.Window) => this._watchNewWindow(win)));
         this._connect(global.display, global.display.connect('restacked',
             () => this._syncDimmerStack()));
+        this._connect(global.display, global.display.connect('window-entered-monitor',
+            (_d: Meta.Display, index: number, win: Meta.Window) => this._onEnteredMonitor(win, index)));
         this._connect(global.workspace_manager, global.workspace_manager.connect(
             'active-workspace-changed', () => {
                 if (this._shown && this.settings.get_boolean('hide-on-workspace-switch'))
@@ -190,6 +194,8 @@ export default class ScratchpadExtension extends Extension {
             ids.forEach(id => win.disconnect(id));
         this._pending.clear();
         this._endTerminalLaunch();
+        this._idleIds.forEach(id => GLib.source_remove(id));
+        this._idleIds.clear();
 
         for (const win of [...this._windows.keys()])
             this._release(win, { restoreVisibility: true });
@@ -200,6 +206,7 @@ export default class ScratchpadExtension extends Extension {
 
         this._dimmer?.destroy();
         this._dimmer = null;
+        this._panes = [];
         this._settings = null;
     }
 
@@ -254,13 +261,24 @@ export default class ScratchpadExtension extends Extension {
             wasSticky: win.is_on_all_workspaces(),
             restoreMaximized: false,
             restoreFullscreen: false,
+            monitor: win.get_monitor(),
         };
         member.ids = [
             win.connect('unmanaged', () => this._forget(win)),
             // Moving the window to a workspace (Super+Shift+1..4, window menu)
             // takes it off "all workspaces": it leaves the scratchpad.
+            //
+            // With workspaces-only-on-primary, mutter does the same when the
+            // user drags a window onto the primary monitor
+            // (meta_window_update_monitor). Then get_monitor() is already the
+            // new monitor, member.monitor is still the old one
+            // (window-entered-monitor comes later), and the window stays.
             win.connect('notify::on-all-workspaces', () => {
-                if (!win.is_on_all_workspaces())
+                if (win.is_on_all_workspaces())
+                    return;
+                if (win.get_monitor() !== member.monitor)
+                    this._restick(win);
+                else
                     this._release(win, { leftAllWorkspaces: true });
             }),
             win.connect('notify::minimized', () => this._onMinimizedChanged(win)),
@@ -273,6 +291,27 @@ export default class ScratchpadExtension extends Extension {
         this._placed.add(win);
         win.stick();
         win.make_above();
+    }
+
+    // Stick again after mutter's own workspace change has finished; sticking
+    // inside its notify would cut that change short.
+    private _restick(win: Meta.Window): void {
+        const id = GLib.idle_add(GLib.PRIORITY_DEFAULT, () => {
+            this._idleIds.delete(id);
+            if (this._windows.has(win) && !win.is_on_all_workspaces())
+                win.stick();
+            return GLib.SOURCE_REMOVE;
+        });
+        this._idleIds.add(id);
+    }
+
+    private _onEnteredMonitor(win: Meta.Window, index: number): void {
+        const member = this._windows.get(win);
+        if (!member)
+            return;
+        member.monitor = index;
+        if (this._shown)
+            this._syncPanes();
     }
 
     private _forget(win: Meta.Window): void {
@@ -317,10 +356,12 @@ export default class ScratchpadExtension extends Extension {
     private _afterMembershipChange(): void {
         if (!this._shown || !this._settings)
             return;
-        if (this._visibleWindows().length === 0)
+        if (this._visibleWindows().length === 0) {
             this._setShown(false);
-        else
+        } else {
             this._layout(false);
+            this._syncPanes();
+        }
     }
 
     // Reacts to minimize/unminimize the user did (dock, Alt+Tab, title bar).
@@ -337,6 +378,8 @@ export default class ScratchpadExtension extends Extension {
         } else {
             this._layout(false);
         }
+        if (this._shown)
+            this._syncPanes();
     }
 
     private _minimize(win: Meta.Window): void {
@@ -425,32 +468,64 @@ export default class ScratchpadExtension extends Extension {
     // removed monitor.
     private _onMonitorsChanged(): void {
         this._monitor = this._monitorIndex(this._monitor);
+        this._createPanes();
         if (!this._shown)
             return;
-        this._placeDimmer();
+        this._syncPanes();
         if (this._tiling())
             this._layout(false);
     }
 
     // ---- dimmer -----------------------------------------------------------
 
+    // One pane per monitor, so the dimmed area can follow the windows.
+    private _createPanes(): void {
+        this._panes.forEach(p => p.destroy());
+        this.dimmer.set_position(0, 0);
+        this.dimmer.set_size(global.stage.width, global.stage.height);
+        this._panes = Main.layoutManager.monitors.map(mon => {
+            const pane = new St.Widget({ reactive: true, visible: false });
+            pane.set_position(mon.x, mon.y);
+            pane.set_size(mon.width, mon.height);
+            pane.connect('button-press-event', () => {
+                this._hide();
+                return Clutter.EVENT_STOP;
+            });
+            this.dimmer.add_child(pane);
+            return pane;
+        });
+        this._updateDimmerStyle();
+    }
+
+    // Dim every monitor that has a visible overlay window; with none (empty
+    // overlay) the monitor the overlay was opened on.
+    private _syncPanes(): void {
+        const wanted = new Set(this._visibleWindows().map(w => w.get_monitor()));
+        if (wanted.size === 0)
+            wanted.add(this._monitorIndex(this._monitor));
+        this._panes.forEach((pane, i) => {
+            pane.visible = wanted.has(i);
+        });
+    }
+
     private _updateDimmerStyle(): void {
         const dim = this.settings.get_double('dim');
-        this.dimmer.set_style(`background-color: rgba(0, 0, 0, ${dim});`);
-
         // BACKGROUND blur cannot be cached and costs GPU time every frame
         // while the overlay is open; `blur false` turns it off.
         const wantBlur = this.settings.get_boolean('blur');
-        const blur = this.dimmer.get_effect('blur');
-        if (wantBlur && !blur) {
-            const scale = St.ThemeContext.get_for_stage(global.stage as Clutter.Stage).scale_factor;
-            this.dimmer.add_effect_with_name('blur', new Shell.BlurEffect({
-                mode: Shell.BlurMode.BACKGROUND,
-                radius: BLUR_RADIUS * scale,
-                brightness: 1.0,
-            }));
-        } else if (!wantBlur && blur) {
-            this.dimmer.remove_effect(blur);
+        const scale = St.ThemeContext.get_for_stage(global.stage as Clutter.Stage).scale_factor;
+        for (const pane of this._panes) {
+            pane.set_style(`background-color: rgba(0, 0, 0, ${dim});`);
+            const blur = pane.get_effect('blur');
+            if (wantBlur && !blur) {
+                pane.add_effect_with_name('blur', new Shell.BlurEffect({
+                    mode: Shell.BlurMode.BACKGROUND,
+                    radius: BLUR_RADIUS * scale,
+                    brightness: 1.0,
+                }));
+            } else if (!wantBlur && blur) {
+                pane.remove_effect(blur);
+            }
         }
     }
 
@@ -459,14 +534,8 @@ export default class ScratchpadExtension extends Extension {
     // stale or black pixels around it and leave a dark trail. Repaint the
     // whole dimmer instead.
     private _redrawBlur(): void {
-        if (this._shown && this._dimmer?.get_effect('blur'))
-            this._dimmer.queue_redraw();
-    }
-
-    private _placeDimmer(): void {
-        const mon = this._monitorRect(this._monitor);
-        this.dimmer.set_position(mon.x, mon.y);
-        this.dimmer.set_size(mon.width, mon.height);
+        if (this._shown && this.settings.get_boolean('blur'))
+            this._panes.forEach(p => p.visible && p.queue_redraw());
     }
 
     // Keeps the dimmer directly below the lowest visible overlay window. The
@@ -488,7 +557,7 @@ export default class ScratchpadExtension extends Extension {
         const d = this.dimmer;
         d.remove_all_transitions();
         if (shown) {
-            this._placeDimmer();
+            this._syncPanes();
             d.show();
             this._syncDimmerStack();
             d.ease({ opacity: 255, duration: DIM_FADE_MS, mode: Clutter.AnimationMode.EASE_OUT_QUAD });
