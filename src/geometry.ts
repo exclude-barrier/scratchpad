@@ -60,3 +60,22 @@ export function validMonitor(index: number, count: number, fallback: number): nu
         return fallback;
     return 0;
 }
+
+// Move frame from one work area to another. The frame keeps its size when it
+// fits (else it shrinks to the target area) and keeps its relative position
+// in the free space, so a window centred on one monitor is centred on the
+// other.
+export function moveToArea(frame: Rect, from: Rect, to: Rect): Rect {
+    const width = Math.max(1, Math.min(frame.width, to.width));
+    const height = Math.max(1, Math.min(frame.height, to.height));
+    const rel = (pos: number, start: number, free: number) =>
+        free > 0 ? Math.min(1, Math.max(0, (pos - start) / free)) : 0.5;
+    const relX = rel(frame.x, from.x, from.width - frame.width);
+    const relY = rel(frame.y, from.y, from.height - frame.height);
+    return {
+        x: to.x + Math.round(relX * (to.width - width)),
+        y: to.y + Math.round(relY * (to.height - height)),
+        width,
+        height,
+    };
+}

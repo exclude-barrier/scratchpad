@@ -7,6 +7,12 @@ own numeric version to each upload.
 
 ## [Unreleased]
 
+### Fixed
+
+- Opening the overlay brings windows from other monitors to the current
+  monitor. Before, a window stayed on the monitor where it first opened, so
+  the terminal could appear only on the second monitor.
+
 ## [1.3.2] — 2026-11-08
 
 ### Changed

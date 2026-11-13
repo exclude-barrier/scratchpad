@@ -39,7 +39,7 @@ import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 import { Extension } from 'resource:///org/gnome/shell/extensions/extension.js';
 
 import * as Compat from './compat.js';
-import { overlayRect, tileColumns, validMonitor, type Rect } from './geometry.js';
+import { moveToArea, overlayRect, tileColumns, validMonitor, type Rect } from './geometry.js';
 
 const SLIDE_IN_MS = 220;
 const SLIDE_OUT_MS = 180;
@@ -332,7 +332,8 @@ export default class ScratchpadExtension extends Extension {
         ];
         this._windows.set(win, member);
         // Every window keeps the position and size you give it, including
-        // the fresh terminal. Only tiling mode moves windows.
+        // the fresh terminal. Only tiling mode, and opening the overlay on
+        // another monitor, moves windows.
         this._placed.add(win);
         win.stick();
         win.make_above();
@@ -524,9 +525,26 @@ export default class ScratchpadExtension extends Extension {
         return Math.max(0, mon.y + mon.height - win.get_frame_rect().y);
     }
 
-    // Free mode (default): windows are never moved or resized. Tiling mode:
-    // the visible windows are laid out side by side in the overlay
-    // rectangle.
+    // Move win to the overlay monitor, keeping its size and relative
+    // position. Returns the slide-in distance. move_resize_frame is async,
+    // so the distance comes from the target frame, not get_frame_rect().
+    private _moveToOverlayMonitor(win: Meta.Window): number {
+        const mon = this._monitorRect(this._monitor);
+        if (win.is_fullscreen() || Compat.isMaximized(win)) {
+            win.move_to_monitor(this._monitor);
+            return mon.height;
+        }
+        const from = Main.layoutManager.getWorkAreaForMonitor(this._monitorIndex(win.get_monitor()));
+        const to = Main.layoutManager.getWorkAreaForMonitor(this._monitor);
+        const r = moveToArea(win.get_frame_rect(), from, to);
+        win.move_resize_frame(true, r.x, r.y, r.width, r.height);
+        return Math.max(0, mon.y + mon.height - r.y);
+    }
+
+    // Free mode (default): windows keep their position and size, except
+    // that opening the overlay brings windows from other monitors to the
+    // current one. Tiling mode: the visible windows are laid out side by
+    // side in the overlay rectangle.
     private _layout(animate: boolean): void {
         this._monitor = this._monitorIndex(this._monitor);
         const rect = this._overlayRect();
@@ -553,6 +571,12 @@ export default class ScratchpadExtension extends Extension {
                 const r = tiling ? columns[i] : rect;
                 win.move_resize_frame(true, r.x, r.y, r.width, r.height);
                 this._placed.add(win);
+            } else if (animate && win.get_monitor() !== this._monitor) {
+                // Opening the overlay brings windows from other monitors to
+                // the current one. Windows on the current monitor keep their
+                // geometry.
+                this._slideIn(win, this._moveToOverlayMonitor(win));
+                return;
             }
             if (animate)
                 this._slideIn(win, place ? mon.y + mon.height - rect.y : this._slideDistance(win));
