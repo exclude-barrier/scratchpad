@@ -16,6 +16,8 @@ position and size you give it, until you release it.
 
 - Any window can join the scratchpad, not only a terminal.
 - Windows keep their position and size. Column tiling is optional.
+- The overlay opens on the monitor you are using. Windows on another monitor
+  move there and keep their size and relative position.
 - Dimmed, blurred background on every monitor that shows an overlay window.
 - The overlay hides on workspace switch or when another window gets focus.
 - Released windows get their earlier state back: always on top, all

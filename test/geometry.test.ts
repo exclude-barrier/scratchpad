@@ -2,7 +2,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { MIN_TILE_WIDTH, overlayRect, tileColumns, validMonitor } from '../src/geometry.js';
+import { MIN_TILE_WIDTH, moveToArea, overlayRect, tileColumns, validMonitor } from '../src/geometry.js';
 
 const area = { x: 0, y: 32, width: 1920, height: 1048 };
 
@@ -46,4 +46,26 @@ test('validMonitor: stale or negative index falls back', () => {
     assert.equal(validMonitor(2, 1, 0), 0);
     assert.equal(validMonitor(-1, 2, 1), 1);
     assert.equal(validMonitor(5, 1, 7), 0);
+});
+
+test('moveToArea: keeps size and relative position', () => {
+    const left = { x: 0, y: 0, width: 1920, height: 1080 };
+    const right = { x: 1920, y: 0, width: 2560, height: 1440 };
+    // Bottom-centred 960x540 frame stays bottom-centred.
+    assert.deepEqual(moveToArea({ x: 480, y: 540, width: 960, height: 540 }, left, right),
+        { x: 1920 + 800, y: 900, width: 960, height: 540 });
+});
+
+test('moveToArea: shrinks a frame that does not fit', () => {
+    const big = { x: 0, y: 0, width: 2560, height: 1440 };
+    const small = { x: 2560, y: 0, width: 1280, height: 720 };
+    assert.deepEqual(moveToArea({ x: 0, y: 0, width: 2000, height: 1000 }, big, small),
+        { x: 2560, y: 0, width: 1280, height: 720 });
+});
+
+test('moveToArea: frame outside its source area is clamped', () => {
+    const a = { x: 0, y: 0, width: 1000, height: 1000 };
+    const b = { x: 1000, y: 0, width: 1000, height: 1000 };
+    assert.deepEqual(moveToArea({ x: -50, y: 1200, width: 100, height: 100 }, a, b),
+        { x: 1000, y: 900, width: 100, height: 100 });
 });
